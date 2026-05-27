@@ -1,7 +1,12 @@
 """Order CRUD tests — will fail (501) until order service is implemented."""
 
-import pytest
+import uuid
 from datetime import date
+
+import pytest
+
+from app.db.models.order import Order
+from app.db.models.user import User
 
 
 ORDER_PAYLOAD = {
@@ -72,6 +77,29 @@ async def test_get_nonexistent_order_returns_404(authed_client):
     response = await authed_client.get(
         "/api/v1/orders/00000000-0000-0000-0000-000000000000"
     )
+    assert response.status_code == 404
+
+
+@pytest.mark.integration
+async def test_get_other_users_order_returns_404(authed_client, db_session):
+    other_user_id = uuid.uuid4()
+    db_session.add(User(
+        id=other_user_id,
+        email="other@example.com",
+        hashed_password="test-hash",
+        is_active=True,
+        is_admin=False,
+    ))
+    order = Order(
+        patient_first_name="Other",
+        patient_last_name="Patient",
+        patient_dob=date(1980, 1, 1),
+        created_by=other_user_id,
+    )
+    db_session.add(order)
+    await db_session.flush()
+
+    response = await authed_client.get(f"/api/v1/orders/{order.id}")
     assert response.status_code == 404
 
 

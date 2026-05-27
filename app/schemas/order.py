@@ -10,6 +10,7 @@ class OrderCreate(BaseModel):
     patient_first_name: str = Field(..., min_length=1, max_length=100)
     patient_last_name: str = Field(..., min_length=1, max_length=100)
     patient_dob: date
+    document_filename: str | None = Field(None, max_length=255)
     notes: str | None = Field(None, max_length=2000)
 
     @field_validator("patient_first_name", "patient_last_name")
@@ -36,6 +37,13 @@ class OrderUpdate(BaseModel):
     @classmethod
     def strip_name(cls, v: str | None) -> str | None:
         return v.strip() if isinstance(v, str) else v
+
+    @field_validator("patient_dob")
+    @classmethod
+    def dob_must_be_past(cls, v: date | None) -> date | None:
+        if v is not None and v >= date.today():
+            raise ValueError("Date of birth must be in the past")
+        return v
 
 
 class OrderResponse(BaseModel):

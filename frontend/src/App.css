@@ -96,7 +96,9 @@
 
 .field input[type="email"],
 .field input[type="password"],
-.field input[type="text"] {
+.field input[type="text"],
+.orders-table input,
+.orders-table select {
   width: 100%;
   padding: 0.55rem 0.75rem;
   border: 1px solid #d1d5db;
@@ -145,6 +147,19 @@
   transition: background 0.15s;
 }
 .btn-danger:hover { background: #fee2e2; }
+
+.btn-secondary {
+  padding: 0.3rem 0.65rem;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  color: #374151;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-secondary:hover:not(:disabled) { background: #f3f4f6; }
+.btn-secondary:disabled { opacity: 0.6; cursor: default; }
 
 /* ── Messages ── */
 .error { color: #ef4444; font-size: 0.9rem; margin: 0.5rem 0; }
@@ -199,6 +214,18 @@
 }
 
 .orders-table tr:hover td { background: #f9fafb; }
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0.4rem;
+}
+
+.row-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
 
 /* ── Status badges ── */
 .badge {

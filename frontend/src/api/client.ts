@@ -62,8 +62,12 @@ export interface OrderCreate {
   patient_first_name: string;
   patient_last_name: string;
   patient_dob: string;
+  document_filename?: string;
+  status?: string;
   notes?: string;
 }
+
+export type OrderUpdate = Partial<OrderCreate>;
 
 export interface ExtractionResult {
   first_name: string;
@@ -79,6 +83,10 @@ export async function createOrder(data: OrderCreate): Promise<Order> {
   return request("/orders", { method: "POST", body: JSON.stringify(data) });
 }
 
+export async function updateOrder(id: string, data: OrderUpdate): Promise<Order> {
+  return request(`/orders/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+
 export async function deleteOrder(id: string): Promise<void> {
   return request(`/orders/${id}`, { method: "DELETE" });
 }
@@ -89,4 +97,10 @@ export async function extractDocument(
   const form = new FormData();
   form.append("file", file);
   return request("/documents/extract", { method: "POST", body: form });
+}
+
+export async function uploadDocumentOrder(file: File): Promise<Order> {
+  const form = new FormData();
+  form.append("file", file);
+  return request("/documents/upload-order", { method: "POST", body: form });
 }

@@ -23,6 +23,8 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402
 from fastapi import Request  # noqa: E402
+from fastapi_cache import FastAPICache  # noqa: E402
+from fastapi_cache.backends.inmemory import InMemoryBackend  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
 
@@ -35,6 +37,11 @@ from app.schemas.auth import UserResponse  # noqa: E402
 TEST_DATABASE_URL = (
     "postgresql+asyncpg://postgres:postgres@localhost:5433/documents_test_db"
 )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def init_cache():
+    FastAPICache.init(InMemoryBackend(), prefix="test-cache")
 
 
 @pytest.fixture(scope="session")

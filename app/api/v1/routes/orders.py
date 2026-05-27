@@ -40,7 +40,7 @@ async def get_order(
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
 ):
-    return await order_service.get_order(db, order_id)
+    return await order_service.get_order(db, current_user.id, order_id)
 
 
 @router.patch("/{order_id}", response_model=OrderResponse)
@@ -50,7 +50,7 @@ async def update_order(
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
 ):
-    return await order_service.update_order(db, order_id, payload)
+    return await order_service.update_order(db, current_user.id, order_id, payload)
 
 
 @router.delete("/{order_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -59,4 +59,4 @@ async def delete_order(
     db: AsyncSession = Depends(get_db),
     current_user: UserResponse = Depends(get_current_user),
 ):
-    await order_service.delete_order(db, order_id)
+    await order_service.delete_order(db, current_user.id, order_id)

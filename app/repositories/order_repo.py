@@ -12,6 +12,7 @@ async def create(db: AsyncSession, user_id: uuid.UUID, payload: OrderCreate) -> 
         patient_first_name=payload.patient_first_name,
         patient_last_name=payload.patient_last_name,
         patient_dob=payload.patient_dob,
+        document_filename=payload.document_filename,
         notes=payload.notes,
         created_by=user_id,
     )
@@ -20,8 +21,13 @@ async def create(db: AsyncSession, user_id: uuid.UUID, payload: OrderCreate) -> 
     return order
 
 
-async def get_by_id(db: AsyncSession, order_id: uuid.UUID) -> Order | None:
-    result = await db.execute(select(Order).where(Order.id == order_id))
+async def get_by_id(
+    db: AsyncSession, order_id: uuid.UUID, user_id: uuid.UUID | None = None
+) -> Order | None:
+    query = select(Order).where(Order.id == order_id)
+    if user_id is not None:
+        query = query.where(Order.created_by == user_id)
+    result = await db.execute(query)
     return result.scalars().first()
 
 

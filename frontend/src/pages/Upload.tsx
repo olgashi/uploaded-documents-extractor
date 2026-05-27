@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { extractDocument, createOrder } from "../api/client";
-import type { ExtractionResult } from "../api/client";
+import { uploadDocumentOrder } from "../api/client";
+import type { Order } from "../api/client";
 
 interface Props {
   onOrderCreated: () => void;
@@ -26,56 +26,32 @@ function friendlyError(raw: string): string {
 
 export default function Upload({ onOrderCreated }: Props) {
   const [file, setFile] = useState<File | null>(null);
-  const [extraction, setExtraction] = useState<ExtractionResult | null>(null);
-  const [filename, setFilename] = useState("");
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [error, setError] = useState("");
-  const [extracting, setExtracting] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
-  async function handleExtract(e: React.FormEvent) {
+  async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
     setError("");
-    setExtraction(null);
-    setSuccess(false);
-    setExtracting(true);
+    setCreatedOrder(null);
+    setUploading(true);
     try {
-      const result = await extractDocument(file);
-      setExtraction(result.extraction);
-      setFilename(result.filename);
-    } catch (err: unknown) {
-      setError(friendlyError(err instanceof Error ? err.message : ""));
-    } finally {
-      setExtracting(false);
-    }
-  }
-
-  async function handleCreateOrder() {
-    if (!extraction) return;
-    setCreating(true);
-    setError("");
-    try {
-      await createOrder({
-        patient_first_name: extraction.first_name,
-        patient_last_name: extraction.last_name,
-        patient_dob: extraction.date_of_birth,
-      });
-      setSuccess(true);
-      setExtraction(null);
+      const order = await uploadDocumentOrder(file);
+      setCreatedOrder(order);
       setFile(null);
       onOrderCreated();
     } catch (err: unknown) {
       setError(friendlyError(err instanceof Error ? err.message : ""));
     } finally {
-      setCreating(false);
+      setUploading(false);
     }
   }
 
   return (
     <div className="upload-page">
       <h2>Upload Patient Document</h2>
-      <form onSubmit={handleExtract} className="upload-form">
+      <form onSubmit={handleUpload} className="upload-form">
         <div className="field">
           <label>PDF Document</label>
           <input
@@ -84,13 +60,13 @@ export default function Upload({ onOrderCreated }: Props) {
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null);
               setError("");
-              setExtraction(null);
+              setCreatedOrder(null);
             }}
             required
           />
         </div>
-        <button type="submit" disabled={!file || extracting} className="btn-primary">
-          {extracting ? "Extracting…" : "Extract Patient Info"}
+        <button type="submit" disabled={!file || uploading} className="btn-primary">
+          {uploading ? "Creating order..." : "Upload & Create Order"}
         </button>
       </form>
 
@@ -101,32 +77,18 @@ export default function Upload({ onOrderCreated }: Props) {
         </div>
       )}
 
-      {extraction && (
+      {createdOrder && (
         <div className="extraction-result">
-          <h3>Extracted Information</h3>
-          <p className="extraction-hint">Please review before creating the order.</p>
+          <h3>Order Created</h3>
           <table className="result-table">
             <tbody>
-              <tr><td>First Name</td><td>{extraction.first_name}</td></tr>
-              <tr><td>Last Name</td><td>{extraction.last_name}</td></tr>
-              <tr><td>Date of Birth</td><td>{extraction.date_of_birth}</td></tr>
-              <tr><td>File</td><td>{filename}</td></tr>
+              <tr><td>First Name</td><td>{createdOrder.patient_first_name}</td></tr>
+              <tr><td>Last Name</td><td>{createdOrder.patient_last_name}</td></tr>
+              <tr><td>Date of Birth</td><td>{createdOrder.patient_dob}</td></tr>
+              <tr><td>Status</td><td>{createdOrder.status}</td></tr>
+              <tr><td>File</td><td>{createdOrder.document_filename ?? "Not recorded"}</td></tr>
             </tbody>
           </table>
-          <button
-            onClick={handleCreateOrder}
-            disabled={creating}
-            className="btn-primary"
-          >
-            {creating ? "Creating order…" : "Confirm & Create Order"}
-          </button>
-        </div>
-      )}
-
-      {success && (
-        <div className="alert alert-success" role="status">
-          <span className="alert-icon">✓</span>
-          <span>Order created successfully.</span>
         </div>
       )}
     </div>

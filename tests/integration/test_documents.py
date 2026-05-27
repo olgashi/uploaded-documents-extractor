@@ -1,8 +1,11 @@
 """Document extraction tests — will fail (501) until LLM service is implemented."""
 
 import io
+from datetime import date
 
 import pytest
+
+from app.schemas.document import DocumentExtractResponse, ExtractionResult
 
 
 @pytest.mark.eval
@@ -66,3 +69,31 @@ async def test_extract_oversized_file_returns_413(authed_client):
         files={"file": ("big.pdf", big_file, "application/pdf")},
     )
     assert response.status_code == 413
+
+
+@pytest.mark.integration
+async def test_upload_order_creates_order(authed_client, monkeypatch):
+    async def fake_extract(file):
+        return DocumentExtractResponse(
+            extraction=ExtractionResult(
+                first_name="Jane",
+                last_name="Doe",
+                date_of_birth=date(1985, 6, 15),
+            ),
+            filename=file.filename,
+        )
+
+    monkeypatch.setattr("app.services.document_service.extract_from_pdf", fake_extract)
+
+    pdf = io.BytesIO(b"%PDF-1.4 fake")
+    response = await authed_client.post(
+        "/api/v1/documents/upload-order",
+        files={"file": ("patient.pdf", pdf, "application/pdf")},
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["patient_first_name"] == "Jane"
+    assert body["patient_last_name"] == "Doe"
+    assert body["patient_dob"] == "1985-06-15"
+    assert body["document_filename"] == "patient.pdf"

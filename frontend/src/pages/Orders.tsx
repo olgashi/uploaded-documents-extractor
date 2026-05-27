@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listOrders, deleteOrder } from "../api/client";
+import { listOrders, deleteOrder, updateOrder } from "../api/client";
 import type { Order } from "../api/client";
 
 interface Props {
@@ -13,12 +13,25 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Cancelled",
 };
 
+const STATUS_OPTIONS = ["pending", "processing", "completed", "cancelled"];
+
+interface OrderDraft {
+  patient_first_name: string;
+  patient_last_name: string;
+  patient_dob: string;
+  status: string;
+  notes: string;
+}
+
 export default function Orders({ refresh }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<OrderDraft | null>(null);
+  const [saving, setSaving] = useState(false);
   const PAGE_SIZE = 10;
 
   useEffect(() => {
@@ -41,6 +54,42 @@ export default function Orders({ refresh }: Props) {
       setTotal((t) => t - 1);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Delete failed");
+    }
+  }
+
+  function startEdit(order: Order) {
+    setEditingId(order.id);
+    setDraft({
+      patient_first_name: order.patient_first_name,
+      patient_last_name: order.patient_last_name,
+      patient_dob: order.patient_dob,
+      status: order.status,
+      notes: order.notes ?? "",
+    });
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraft(null);
+  }
+
+  async function saveEdit(id: string) {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      const updated = await updateOrder(id, {
+        patient_first_name: draft.patient_first_name,
+        patient_last_name: draft.patient_last_name,
+        patient_dob: draft.patient_dob,
+        status: draft.status,
+        notes: draft.notes,
+      });
+      setOrders((prev) => prev.map((order) => (order.id === id ? updated : order)));
+      cancelEdit();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -69,17 +118,82 @@ export default function Orders({ refresh }: Props) {
             <tbody>
               {orders.map((o) => (
                 <tr key={o.id}>
-                  <td>{o.patient_first_name} {o.patient_last_name}</td>
-                  <td>{o.patient_dob}</td>
-                  <td><span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status] ?? o.status}</span></td>
+                  {editingId === o.id && draft ? (
+                    <>
+                      <td>
+                        <div className="edit-grid">
+                          <input
+                            value={draft.patient_first_name}
+                            onChange={(e) => setDraft({ ...draft, patient_first_name: e.target.value })}
+                            aria-label="First name"
+                          />
+                          <input
+                            value={draft.patient_last_name}
+                            onChange={(e) => setDraft({ ...draft, patient_last_name: e.target.value })}
+                            aria-label="Last name"
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <input
+                          type="date"
+                          value={draft.patient_dob}
+                          onChange={(e) => setDraft({ ...draft, patient_dob: e.target.value })}
+                          aria-label="Date of birth"
+                        />
+                      </td>
+                      <td>
+                        <select
+                          value={draft.status}
+                          onChange={(e) => setDraft({ ...draft, status: e.target.value })}
+                          aria-label="Status"
+                        >
+                          {STATUS_OPTIONS.map((status) => (
+                            <option key={status} value={status}>
+                              {STATUS_LABEL[status]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{o.patient_first_name} {o.patient_last_name}</td>
+                      <td>{o.patient_dob}</td>
+                      <td><span className={`badge badge-${o.status}`}>{STATUS_LABEL[o.status] ?? o.status}</span></td>
+                    </>
+                  )}
                   <td>{new Date(o.created_at).toLocaleDateString()}</td>
                   <td>
-                    <button
-                      onClick={() => handleDelete(o.id)}
-                      className="btn-danger"
-                    >
-                      Delete
-                    </button>
+                    {editingId === o.id ? (
+                      <div className="row-actions">
+                        <button
+                          onClick={() => saveEdit(o.id)}
+                          disabled={saving}
+                          className="btn-secondary"
+                        >
+                          Save
+                        </button>
+                        <button onClick={cancelEdit} className="btn-secondary">
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="row-actions">
+                        <button
+                          onClick={() => startEdit(o)}
+                          className="btn-secondary"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleDelete(o.id)}
+                          className="btn-danger"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
