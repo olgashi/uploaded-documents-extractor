@@ -47,6 +47,24 @@ async def get_all(
     return items, total
 
 
+async def get_uploaded_duplicate(
+    db: AsyncSession, user_id: uuid.UUID, payload: OrderCreate
+) -> Order | None:
+    if not payload.document_filename:
+        return None
+
+    result = await db.execute(
+        select(Order).where(
+            Order.created_by == user_id,
+            func.lower(Order.patient_first_name) == payload.patient_first_name.lower(),
+            func.lower(Order.patient_last_name) == payload.patient_last_name.lower(),
+            Order.patient_dob == payload.patient_dob,
+            Order.document_filename == payload.document_filename,
+        )
+    )
+    return result.scalars().first()
+
+
 async def update(db: AsyncSession, order: Order, payload: OrderUpdate) -> Order:
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(order, key, value)

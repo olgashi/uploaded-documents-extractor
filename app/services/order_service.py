@@ -28,6 +28,12 @@ async def list_orders(
     return await order_repo.get_all(db, user_id, page, page_size)
 
 
+async def get_uploaded_duplicate(
+    db: AsyncSession, user_id: uuid.UUID, payload: OrderCreate
+) -> Order | None:
+    return await order_repo.get_uploaded_duplicate(db, user_id, payload)
+
+
 async def update_order(
     db: AsyncSession, user_id: uuid.UUID, order_id: uuid.UUID, payload: OrderUpdate
 ) -> Order:

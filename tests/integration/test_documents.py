@@ -97,3 +97,34 @@ async def test_upload_order_creates_order(authed_client, monkeypatch):
     assert body["patient_last_name"] == "Doe"
     assert body["patient_dob"] == "1985-06-15"
     assert body["document_filename"] == "patient.pdf"
+
+
+@pytest.mark.integration
+async def test_upload_order_same_document_returns_existing_order(authed_client, monkeypatch):
+    async def fake_extract(file):
+        return DocumentExtractResponse(
+            extraction=ExtractionResult(
+                first_name="Jane",
+                last_name="Doe",
+                date_of_birth=date(1985, 6, 15),
+            ),
+            filename=file.filename,
+        )
+
+    monkeypatch.setattr("app.services.document_service.extract_from_pdf", fake_extract)
+
+    first_response = await authed_client.post(
+        "/api/v1/documents/upload-order",
+        files={"file": ("patient.pdf", io.BytesIO(b"%PDF-1.4 fake"), "application/pdf")},
+    )
+    second_response = await authed_client.post(
+        "/api/v1/documents/upload-order",
+        files={"file": ("patient.pdf", io.BytesIO(b"%PDF-1.4 fake"), "application/pdf")},
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 200
+    assert second_response.json()["id"] == first_response.json()["id"]
+
+    list_response = await authed_client.get("/api/v1/orders")
+    assert list_response.json()["total"] == 1
