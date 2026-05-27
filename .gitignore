@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment — never commit secrets
+.env
+.env.local
+.env.production
+.env.staging
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads (runtime artefacts, not source)
+uploads/
+
+# Node (frontend)
+node_modules/
+frontend/dist/
+frontend/.env
