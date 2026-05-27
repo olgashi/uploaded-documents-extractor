@@ -104,6 +104,18 @@ async def test_get_other_users_order_returns_404(authed_client, db_session):
 
 
 @pytest.mark.integration
+async def test_update_order_status(authed_client):
+    create_resp = await authed_client.post("/api/v1/orders", json=ORDER_PAYLOAD)
+    order_id = create_resp.json()["id"]
+
+    response = await authed_client.patch(
+        f"/api/v1/orders/{order_id}", json={"status": "completed"}
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+
+
+@pytest.mark.integration
 async def test_update_order_invalid_status_returns_422(authed_client):
     create_resp = await authed_client.post("/api/v1/orders", json=ORDER_PAYLOAD)
     order_id = create_resp.json()["id"]
@@ -131,3 +143,19 @@ async def test_deleted_order_returns_404(authed_client):
     await authed_client.delete(f"/api/v1/orders/{order_id}")
     response = await authed_client.get(f"/api/v1/orders/{order_id}")
     assert response.status_code == 404
+
+
+@pytest.mark.integration
+async def test_delete_orders_clears_current_users_orders(authed_client):
+    await authed_client.post("/api/v1/orders", json=ORDER_PAYLOAD)
+    await authed_client.post(
+        "/api/v1/orders",
+        json={**ORDER_PAYLOAD, "patient_first_name": "Janet"},
+    )
+
+    response = await authed_client.delete("/api/v1/orders")
+    assert response.status_code == 204
+
+    list_response = await authed_client.get("/api/v1/orders")
+    assert list_response.status_code == 200
+    assert list_response.json()["total"] == 0

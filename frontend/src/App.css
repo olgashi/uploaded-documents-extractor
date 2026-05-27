@@ -191,6 +191,16 @@
   color: #1e1e2e;
 }
 
+.page-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.page-heading h2 { margin: 0; }
+
 .orders-table {
   width: 100%;
   border-collapse: collapse;

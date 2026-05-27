@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { listOrders, deleteOrder, updateOrder } from "../api/client";
+import { clearOrders, listOrders, deleteOrder, updateOrder } from "../api/client";
 import type { Order } from "../api/client";
 
 interface Props {
@@ -57,6 +57,19 @@ export default function Orders({ refresh }: Props) {
     }
   }
 
+  async function handleClearOrders() {
+    if (!confirm("Delete all orders for this account?")) return;
+    try {
+      await clearOrders();
+      setOrders([]);
+      setTotal(0);
+      setPage(1);
+      cancelEdit();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Clear failed");
+    }
+  }
+
   function startEdit(order: Order) {
     setEditingId(order.id);
     setDraft({
@@ -100,7 +113,14 @@ export default function Orders({ refresh }: Props) {
 
   return (
     <div className="orders-page">
-      <h2>Orders ({total})</h2>
+      <div className="page-heading">
+        <h2>Orders ({total})</h2>
+        {total > 0 && (
+          <button onClick={handleClearOrders} className="btn-danger">
+            Clear Orders
+          </button>
+        )}
+      </div>
       {orders.length === 0 ? (
         <p className="empty">No orders yet. Upload a document to create one.</p>
       ) : (

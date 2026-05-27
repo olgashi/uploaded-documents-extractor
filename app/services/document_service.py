@@ -2,6 +2,7 @@ import base64
 import io
 import json
 from datetime import date
+from pathlib import Path
 
 import fitz  # pymupdf
 import openai
@@ -121,11 +122,14 @@ async def extract_from_pdf(file: UploadFile) -> DocumentExtractResponse:
             detail="Could not extract all required fields from document",
         )
 
+    raw_filename = file.filename or "unknown"
+    safe_filename = (Path(raw_filename).name or "unknown")[:255]
+
     return DocumentExtractResponse(
         extraction=ExtractionResult(
             first_name=data["first_name"],
             last_name=data["last_name"],
             date_of_birth=dob,
         ),
-        filename=file.filename or "unknown",
+        filename=safe_filename,
     )

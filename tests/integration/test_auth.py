@@ -89,3 +89,14 @@ async def test_protected_route_with_invalid_token_returns_401(client):
         "/api/v1/orders", headers={"Authorization": "Bearer not.a.valid.token"}
     )
     assert resp.status_code == 401
+
+
+@pytest.mark.integration
+async def test_protected_route_with_non_uuid_subject_returns_401(client):
+    token = jwt.encode(
+        {"sub": "not-a-uuid"},
+        settings.SECRET_KEY,
+        algorithm=settings.ALGORITHM,
+    )
+    resp = await client.get("/api/v1/orders", headers={"Authorization": f"Bearer {token}"})
+    assert resp.status_code == 401

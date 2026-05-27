@@ -32,7 +32,12 @@ async def get_current_user(
     except JWTError:
         raise _UNAUTH
 
-    user = await user_repo.get_by_id(db, uuid.UUID(user_id))
+    try:
+        parsed_user_id = uuid.UUID(user_id)
+    except (AttributeError, TypeError, ValueError):
+        raise _UNAUTH
+
+    user = await user_repo.get_by_id(db, parsed_user_id)
     if user is None or not user.is_active:
         raise _UNAUTH
 

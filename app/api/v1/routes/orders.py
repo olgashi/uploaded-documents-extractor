@@ -34,6 +34,14 @@ async def create_order(
     return await order_service.create_order(db, current_user.id, payload)
 
 
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_orders(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserResponse = Depends(get_current_user),
+):
+    await order_service.delete_user_orders(db, current_user.id)
+
+
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(
     order_id: UUID,

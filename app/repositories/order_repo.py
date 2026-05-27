@@ -1,5 +1,6 @@
 import uuid
 
+from sqlalchemy import delete as sqlalchemy_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,9 +51,16 @@ async def update(db: AsyncSession, order: Order, payload: OrderUpdate) -> Order:
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(order, key, value)
     await db.flush()
+    await db.refresh(order)
     return order
 
 
 async def delete(db: AsyncSession, order: Order) -> None:
     await db.delete(order)
     await db.flush()
+
+
+async def delete_all_by_user(db: AsyncSession, user_id: uuid.UUID) -> int:
+    result = await db.execute(sqlalchemy_delete(Order).where(Order.created_by == user_id))
+    await db.flush()
+    return result.rowcount or 0

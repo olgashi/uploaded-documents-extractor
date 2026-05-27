@@ -4,6 +4,26 @@ function getToken(): string | null {
   return localStorage.getItem("token");
 }
 
+function formatErrorDetail(detail: unknown, fallback: string): string {
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object" && "msg" in item) {
+          return String((item as { msg: unknown }).msg);
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join("; ") || fallback;
+  }
+  if (detail && typeof detail === "object" && "msg" in detail) {
+    return String((detail as { msg: unknown }).msg);
+  }
+  return fallback;
+}
+
 async function request<T>(
   path: string,
   options: RequestInit = {}
@@ -20,7 +40,7 @@ async function request<T>(
   const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(err.detail ?? res.statusText);
+    throw new Error(formatErrorDetail(err.detail, res.statusText || "Request failed"));
   }
   if (res.status === 204) return undefined as T;
   return res.json();
@@ -89,6 +109,10 @@ export async function updateOrder(id: string, data: OrderUpdate): Promise<Order>
 
 export async function deleteOrder(id: string): Promise<void> {
   return request(`/orders/${id}`, { method: "DELETE" });
+}
+
+export async function clearOrders(): Promise<void> {
+  return request("/orders", { method: "DELETE" });
 }
 
 export async function extractDocument(
