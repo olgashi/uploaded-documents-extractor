@@ -1,7 +1,9 @@
+import base64
 import io
 import json
 from datetime import date
 
+import fitz  # pymupdf
 import openai
 from fastapi import HTTPException, UploadFile, status
 from openai import AsyncOpenAI
@@ -14,7 +16,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 _SYSTEM = (
     "You are a medical document parser. Extract the patient's first name, last name, "
-    "and date of birth from the provided text. "
+    "and date of birth from the provided document. "
     'Return ONLY a JSON object with keys "first_name" (string), "last_name" (string), '
     '"date_of_birth" (ISO date YYYY-MM-DD). Use null for any field not found.'
 )
@@ -22,6 +24,19 @@ _SYSTEM = (
 
 def _get_client() -> AsyncOpenAI:
     return AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+
+def _pdf_to_images(content: bytes) -> list[str]:
+    """Render each PDF page to a base64-encoded PNG. Returns up to 3 pages."""
+    doc = fitz.open(stream=content, filetype="pdf")
+    images = []
+    for i, page in enumerate(doc):
+        if i >= 3:
+            break
+        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+        images.append(base64.b64encode(pix.tobytes("png")).decode())
+    doc.close()
+    return images
 
 
 async def extract_from_pdf(file: UploadFile) -> DocumentExtractResponse:
@@ -38,16 +53,35 @@ async def extract_from_pdf(file: UploadFile) -> DocumentExtractResponse:
 
     try:
         reader = PdfReader(io.BytesIO(content))
-        text = "\n".join(page.extract_text() or "" for page in reader.pages)
+        text = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not parse PDF")
+
+    # Use vision API for scanned PDFs (no text layer), text API otherwise
+    if text:
+        user_content: list | str = text[:8000]
+    else:
+        try:
+            images = _pdf_to_images(content)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not parse PDF")
+        user_content = [
+            *[
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{img}", "detail": "high"},
+                }
+                for img in images
+            ],
+            {"type": "text", "text": "Extract the patient information from this document."},
+        ]
 
     try:
         response = await _get_client().chat.completions.create(
             model=settings.OPENAI_MODEL,
             messages=[
                 {"role": "system", "content": _SYSTEM},
-                {"role": "user", "content": text[:8000]},
+                {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
             temperature=0,
