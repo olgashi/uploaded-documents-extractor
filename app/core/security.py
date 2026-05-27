@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +20,7 @@ _UNAUTH = HTTPException(
 
 
 async def get_current_user(
+    request: Request,
     token: str = Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> UserResponse:
@@ -35,4 +36,5 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise _UNAUTH
 
+    request.state.current_user_id = user.id
     return UserResponse.model_validate(user)

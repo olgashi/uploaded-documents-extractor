@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import router as api_v1_router
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.middleware.activity_log import ActivityLogMiddleware
 from app.services.auth_service import seed_admin
 
 configure_logging()
@@ -30,6 +31,7 @@ app = FastAPI(
     redoc_url="/api/redoc" if settings.ENVIRONMENT != "production" else None,
 )
 
+app.add_middleware(ActivityLogMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,

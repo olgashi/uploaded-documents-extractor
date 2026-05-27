@@ -4,25 +4,33 @@ Shared pytest fixtures.
 Test DB runs on port 5433 (db_test service in compose.yml) so tests
 never touch the dev database.
 
-Event-loop note: asyncpg connection pools are bound to the loop that created them.
-asyncio_default_fixture_loop_scope = "function" ensures function-scoped async fixtures
-(db_session, db_fake_user, authed_client) run on the same event loop as the test.
-create_tables is a sync fixture that uses asyncio.run() so it has no loop dependency.
+DATABASE_URL is overridden in os.environ before app imports so that AsyncSessionLocal
+(used by the activity-log middleware) also targets the test DB. This lets middleware
+commits be visible to the test's db_session via READ COMMITTED.
+
+Event-loop note: asyncpg_default_fixture_loop_scope = "function" ensures function-scoped
+async fixtures run on the same event loop as the test.
 """
 
 import asyncio
+import os
 import uuid
 
-import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+# Must be set before any app imports so settings/engine are initialized with the test DB.
+TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5433/documents_test_db"
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 
-from app.core.security import get_current_user
-from app.db.base import Base
-from app.db.session import get_db
-from app.main import app
-from app.schemas.auth import UserResponse
+import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from fastapi import Request  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine  # noqa: E402
+
+from app.core.security import get_current_user  # noqa: E402
+from app.db.base import Base  # noqa: E402
+from app.db.session import get_db  # noqa: E402
+from app.main import app  # noqa: E402
+from app.schemas.auth import UserResponse  # noqa: E402
 
 TEST_DATABASE_URL = (
     "postgresql+asyncpg://postgres:postgres@localhost:5433/documents_test_db"
@@ -116,7 +124,8 @@ async def authed_client(db_session: AsyncSession, db_fake_user: UserResponse) ->
     async def override_get_db():
         yield db_session
 
-    async def override_get_current_user():
+    async def override_get_current_user(request: Request):
+        request.state.current_user_id = db_fake_user.id
         return db_fake_user
 
     app.dependency_overrides[get_db] = override_get_db

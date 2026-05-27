@@ -5,6 +5,7 @@ import io
 import pytest
 
 
+@pytest.mark.eval
 @pytest.mark.integration
 async def test_extract_pdf_returns_patient_info(authed_client):
     """Upload the sample PDF and expect all three fields back."""
@@ -23,6 +24,7 @@ async def test_extract_pdf_returns_patient_info(authed_client):
     assert extraction["date_of_birth"]
 
 
+@pytest.mark.eval
 @pytest.mark.integration
 async def test_extract_returns_valid_date_format(authed_client):
     with open("DME Patient Demo Document CPAP.fax.pdf", "rb") as f:
