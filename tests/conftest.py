@@ -5,11 +5,12 @@ Test DB runs on port 5433 (db_test service in compose.yml) so tests
 never touch the dev database.
 
 Event-loop note: asyncpg connection pools are bound to the loop that created them.
-To avoid "Future attached to a different loop" errors, each db_session creates its
-own engine so the pool is always tied to the current test's loop. The session-scoped
-create_tables fixture handles DDL (create / drop) without holding any connections.
+asyncio_default_fixture_loop_scope = "function" ensures function-scoped async fixtures
+(db_session, db_fake_user, authed_client) run on the same event loop as the test.
+create_tables is a sync fixture that uses asyncio.run() so it has no loop dependency.
 """
 
+import asyncio
 import uuid
 
 import pytest
@@ -28,24 +29,24 @@ TEST_DATABASE_URL = (
 )
 
 
-@pytest_asyncio.fixture(scope="session")
-async def create_tables():
-    """Run DDL once per session; individual tests handle their own data cleanup."""
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-    await engine.dispose()
+@pytest.fixture(scope="session")
+def create_tables():
+    """Run DDL once per session using asyncio.run() to stay loop-independent."""
+    async def _ddl(drop: bool) -> None:
+        engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+        async with engine.begin() as conn:
+            if drop:
+                await conn.run_sync(Base.metadata.drop_all)
+            await conn.run_sync(Base.metadata.create_all)
+        await engine.dispose()
+
+    asyncio.run(_ddl(drop=True))
     yield
-    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-    await engine.dispose()
+    asyncio.run(_ddl(drop=False))  # leave tables; DB is wiped on next test run
 
 
 @pytest_asyncio.fixture
 async def db_session(create_tables) -> AsyncSession:
-    # Fresh engine per test so the asyncpg pool is bound to this test's event loop
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     try:
         factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -94,13 +95,29 @@ async def client(db_session: AsyncSession) -> AsyncClient:
 
 
 @pytest_asyncio.fixture
-async def authed_client(db_session: AsyncSession, fake_user: UserResponse) -> AsyncClient:
+async def db_fake_user(db_session: AsyncSession, fake_user: UserResponse) -> UserResponse:
+    """Stage fake_user in the session so FK constraints on orders.created_by are satisfied.
+    No explicit flush — SQLAlchemy inserts the user before the first order (UoW FK ordering)."""
+    from app.db.models.user import User
+
+    db_session.add(User(
+        id=fake_user.id,
+        email=fake_user.email,
+        hashed_password="test-hash",
+        is_active=True,
+        is_admin=False,
+    ))
+    return fake_user
+
+
+@pytest_asyncio.fixture
+async def authed_client(db_session: AsyncSession, db_fake_user: UserResponse) -> AsyncClient:
     """Client with get_current_user bypassed — use for all protected endpoint tests."""
     async def override_get_db():
         yield db_session
 
     async def override_get_current_user():
-        return fake_user
+        return db_fake_user
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user
