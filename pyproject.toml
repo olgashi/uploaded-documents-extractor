@@ -1,6 +1,11 @@
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "unit: fast, no external dependencies",
+    "integration: requires running test database (port 5433)",
+    "eval: requires OPENAI_API_KEY; may be slow",
+]
 
 [tool.ruff]
 line-length = 100
