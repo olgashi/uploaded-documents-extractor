@@ -4,6 +4,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.router import router as api_v1_router
 from app.core.config import settings
 from app.core.logging import configure_logging
 
@@ -35,4 +36,4 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routes registered in later commits as they are implemented
+app.include_router(api_v1_router)
