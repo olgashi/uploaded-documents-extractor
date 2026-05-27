@@ -2,6 +2,7 @@ import io
 import json
 from datetime import date
 
+import openai
 from fastapi import HTTPException, UploadFile, status
 from openai import AsyncOpenAI
 from pypdf import PdfReader
@@ -41,15 +42,36 @@ async def extract_from_pdf(file: UploadFile) -> DocumentExtractResponse:
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not parse PDF")
 
-    response = await _get_client().chat.completions.create(
-        model=settings.OPENAI_MODEL,
-        messages=[
-            {"role": "system", "content": _SYSTEM},
-            {"role": "user", "content": text[:8000]},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0,
-    )
+    try:
+        response = await _get_client().chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[
+                {"role": "system", "content": _SYSTEM},
+                {"role": "user", "content": text[:8000]},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0,
+        )
+    except openai.AuthenticationError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Extraction service is not configured. Contact support.",
+        )
+    except openai.RateLimitError:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Extraction service is busy. Please try again shortly.",
+        )
+    except openai.APIConnectionError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not reach extraction service. Please try again.",
+        )
+    except openai.APIError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Extraction service returned an error. Please try again.",
+        )
 
     data = json.loads(response.choices[0].message.content)
 

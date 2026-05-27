@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     OPENAI_MODEL: str = "gpt-4o"
 
+    @field_validator("OPENAI_API_KEY")
+    @classmethod
+    def openai_key_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("OPENAI_API_KEY must not be empty")
+        return v
+
     # --- Rate limiting (slowapi format: "N/period") ---
     RATE_LIMIT_EXTRACT: str = "5/minute"
     RATE_LIMIT_API: str = "100/minute"
