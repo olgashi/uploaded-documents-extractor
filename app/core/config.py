@@ -32,6 +32,7 @@ class Settings(BaseSettings):
 
     # --- Rate limiting (slowapi format: "N/period") ---
     RATE_LIMIT_EXTRACT: str = "5/minute"
+    RATE_LIMIT_AUTH: str = "10/minute"
     RATE_LIMIT_API: str = "100/minute"
 
     # --- Application ---
