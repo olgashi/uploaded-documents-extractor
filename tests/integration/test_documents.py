@@ -1,4 +1,4 @@
-"""Document extraction tests — will fail (501) until LLM service is implemented."""
+"""Document extraction tests."""
 
 import io
 from datetime import date
