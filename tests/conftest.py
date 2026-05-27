@@ -3,6 +3,11 @@ Shared pytest fixtures.
 
 Test DB runs on port 5433 (db_test service in compose.yml) so tests
 never touch the dev database.
+
+Event-loop note: asyncpg connection pools are bound to the loop that created them.
+To avoid "Future attached to a different loop" errors, each db_session creates its
+own engine so the pool is always tied to the current test's loop. The session-scoped
+create_tables fixture handles DDL (create / drop) without holding any connections.
 """
 
 import uuid
@@ -23,28 +28,32 @@ TEST_DATABASE_URL = (
 )
 
 
-@pytest.fixture(scope="session")
-def anyio_backend():
-    return "asyncio"
-
-
 @pytest_asyncio.fixture(scope="session")
-async def test_engine():
+async def create_tables():
+    """Run DDL once per session; individual tests handle their own data cleanup."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-    yield engine
+    await engine.dispose()
+    yield
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 
 @pytest_asyncio.fixture
-async def db_session(test_engine) -> AsyncSession:
-    session_factory = async_sessionmaker(test_engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
-        await session.rollback()
+async def db_session(create_tables) -> AsyncSession:
+    # Fresh engine per test so the asyncpg pool is bound to this test's event loop
+    engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+    try:
+        factory = async_sessionmaker(engine, expire_on_commit=False)
+        async with factory() as session:
+            yield session
+            await session.rollback()
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture
@@ -55,6 +64,21 @@ def fake_user() -> UserResponse:
         is_active=True,
         is_admin=False,
     )
+
+
+@pytest_asyncio.fixture
+async def db_user(db_session: AsyncSession) -> UserResponse:
+    """A real persisted user for auth integration tests."""
+    from app.repositories.user_repo import create
+    from app.services.auth_service import hash_password
+
+    user = await create(
+        db_session,
+        email="test@example.com",
+        hashed_password=hash_password("test-password-123"),
+    )
+    await db_session.flush()
+    return UserResponse.model_validate(user)
 
 
 @pytest_asyncio.fixture

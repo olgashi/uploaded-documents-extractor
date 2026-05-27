@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import router as api_v1_router
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.services.auth_service import seed_admin
 
 configure_logging()
 logger = structlog.get_logger(__name__)
@@ -15,6 +16,7 @@ logger = structlog.get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("startup", environment=settings.ENVIRONMENT, model=settings.OPENAI_MODEL)
+    await seed_admin()
     yield
     logger.info("shutdown")
 
